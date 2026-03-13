@@ -1,8 +1,9 @@
+import asyncio
+
 import boto3
 from botocore.client import BaseClient
 
 from src.platform.config import settings
-
 
 _s3_client: BaseClient | None = None
 
@@ -20,7 +21,7 @@ def _client() -> BaseClient:
     return _s3_client
 
 
-def upload_text(s3_key: str, text: str) -> None:
+def _upload_text_sync(s3_key: str, text: str) -> None:
     _client().put_object(
         Bucket=settings.s3_bucket,
         Key=s3_key,
@@ -29,6 +30,14 @@ def upload_text(s3_key: str, text: str) -> None:
     )
 
 
-def download_text(s3_key: str) -> str:
+async def upload_text(s3_key: str, text: str) -> None:
+    await asyncio.to_thread(_upload_text_sync, s3_key, text)
+
+
+def _download_text_sync(s3_key: str) -> str:
     response = _client().get_object(Bucket=settings.s3_bucket, Key=s3_key)
     return response["Body"].read().decode("utf-8")
+
+
+async def download_text(s3_key: str) -> str:
+    return await asyncio.to_thread(_download_text_sync, s3_key)

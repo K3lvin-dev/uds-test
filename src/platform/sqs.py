@@ -1,10 +1,10 @@
+import asyncio
 import json
 
 import boto3
 from botocore.client import BaseClient
 
 from src.platform.config import settings
-
 
 _sqs_client: BaseClient | None = None
 
@@ -22,14 +22,18 @@ def _client() -> BaseClient:
     return _sqs_client
 
 
-def publish_message(submission_id: str) -> None:
+def _publish_message_sync(submission_id: str) -> None:
     _client().send_message(
         QueueUrl=settings.sqs_queue_url,
         MessageBody=json.dumps({"submission_id": submission_id}),
     )
 
 
-def receive_messages(
+async def publish_message(submission_id: str) -> None:
+    await asyncio.to_thread(_publish_message_sync, submission_id)
+
+
+def _receive_messages_sync(
     max_messages: int = 1,
     visibility_timeout: int = 120,
     wait_seconds: int = 20,
@@ -43,8 +47,22 @@ def receive_messages(
     return response.get("Messages", [])
 
 
-def delete_message(receipt_handle: str) -> None:
+async def receive_messages(
+    max_messages: int = 1,
+    visibility_timeout: int = 120,
+    wait_seconds: int = 20,
+) -> list[dict]:
+    return await asyncio.to_thread(
+        _receive_messages_sync, max_messages, visibility_timeout, wait_seconds
+    )
+
+
+def _delete_message_sync(receipt_handle: str) -> None:
     _client().delete_message(
         QueueUrl=settings.sqs_queue_url,
         ReceiptHandle=receipt_handle,
     )
+
+
+async def delete_message(receipt_handle: str) -> None:
+    await asyncio.to_thread(_delete_message_sync, receipt_handle)
