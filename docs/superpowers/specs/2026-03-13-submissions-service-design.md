@@ -92,16 +92,24 @@ uds-test/
 
 ### Worker (loop continuo)
 
-1. Poll SQS → recebe `submission_id`
+1. Poll SQS (visibility timeout: 120s) → recebe `submission_id`
 2. Busca submission no DB → pega `s3_key`
-3. Baixa texto do S3
-4. Envia para Gemini Flash com prompt estruturado
-5. Atualiza DB: `status=GRADED`, `score`, `criteria` (JSONB), `overall_feedback`, `updated_at`
-6. Deleta mensagem da fila
+3. Verifica idempotencia: se `status != PENDING`, ignora (deleta mensagem e retorna)
+4. Atualiza DB: `status=PROCESSING`
+5. Baixa texto do S3
+6. Envia para Gemini Flash com prompt estruturado
+7. Se sucesso: atualiza DB com `status=GRADED`, `score`, `criteria` (JSONB), `overall_feedback`, `updated_at`
+8. Se erro: atualiza DB com `status=ERROR`, `updated_at`
+9. Deleta mensagem da fila
 
 ### Status Machine
 
 `PENDING` → `PROCESSING` → `GRADED` | `ERROR`
+
+- `PENDING`: submission criada, aguardando worker
+- `PROCESSING`: worker pegou a mensagem, correcao em andamento
+- `GRADED`: correcao concluida com sucesso
+- `ERROR`: falha na correcao (Gemini indisponivel, erro de parsing, etc.)
 
 ## API REST
 
@@ -112,6 +120,7 @@ Todos os endpoints sob `/api/v1/submissions`. RESTful: status codes corretos, Lo
 ```
 Request:
   { "student_id": "abc", "text": "..." }
+  Validacao: student_id obrigatorio, text obrigatorio (max 10.000 caracteres)
 
 Response: 201 Created
 Headers:
@@ -165,6 +174,8 @@ Body:
     "page": 1,
     "per_page": 10
   }
+
+Ordenacao: created_at DESC (mais recentes primeiro)
 
 Errors:
   422 - student_id obrigatorio
