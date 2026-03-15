@@ -1,11 +1,18 @@
 import asyncio
 from datetime import UTC, datetime, timedelta
+from typing import TypedDict, cast
 
 from sqlalchemy import delete, select, update
 
 from src.infra import s3, sqs
 from src.infra.database import async_session_factory
 from src.infra.models import OutboxEvent, Submission, SubmissionStatus
+
+
+class OutboxPayload(TypedDict):
+    submission_id: str
+    text: str
+
 
 _POLL_INTERVAL = 5
 _MAX_RETRIES = 3
@@ -22,8 +29,9 @@ async def _process_one() -> bool:
         if event is None:
             return False
 
-        submission_id = event.payload["submission_id"]
-        text = event.payload["text"]
+        payload = cast(OutboxPayload, event.payload)
+        submission_id = payload["submission_id"]
+        text = payload["text"]
         s3_key = f"submissions/{submission_id}.txt"
 
         await s3.upload_text(s3_key, text)

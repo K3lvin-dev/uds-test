@@ -28,7 +28,7 @@ class Submission(Base):
     )
     student_id: Mapped[str] = mapped_column(String(100), nullable=False)
     s3_key: Mapped[str] = mapped_column(String(500), nullable=False)
-    status: Mapped[str] = mapped_column(
+    status: Mapped[SubmissionStatus] = mapped_column(
         String(20), nullable=False, default=SubmissionStatus.PENDING
     )
     retry_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

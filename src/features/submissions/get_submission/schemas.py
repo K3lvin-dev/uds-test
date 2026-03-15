@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 from src.infra.models import SubmissionStatus
 from src.infra.types import BRTDatetime
-from src.workers.grade_submission.schemas import CriterionResult
+from src.workers.grade_submission.schemas import CriterionResult, GradingCriteria
 
 
 class SubmissionDetailResponse(BaseModel):
@@ -14,7 +14,7 @@ class SubmissionDetailResponse(BaseModel):
     s3_key: str
     status: SubmissionStatus
     score: Decimal | None
-    criteria: dict[str, CriterionResult] | None
+    criteria: dict[GradingCriteria, CriterionResult] | None
     overall_feedback: str | None
     created_at: BRTDatetime
     updated_at: BRTDatetime
