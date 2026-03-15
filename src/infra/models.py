@@ -3,7 +3,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import DateTime, Numeric, String, Text, func
+from sqlalchemy import DateTime, Integer, Numeric, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -21,6 +21,7 @@ class Submission(Base):
     student_id: Mapped[str] = mapped_column(String(100), nullable=False)
     s3_key: Mapped[str] = mapped_column(String(500), nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="PENDING")
+    retry_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     score: Mapped[Decimal | None] = mapped_column(Numeric(4, 2), nullable=True)
     criteria: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     overall_feedback: Mapped[str | None] = mapped_column(Text, nullable=True)

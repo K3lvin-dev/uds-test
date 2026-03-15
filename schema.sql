@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS submissions (
     student_id VARCHAR(100) NOT NULL,
     s3_key VARCHAR(500) NOT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+    retry_count INT NOT NULL DEFAULT 0,
     score NUMERIC(4, 2),
     criteria JSONB,
     overall_feedback TEXT,
