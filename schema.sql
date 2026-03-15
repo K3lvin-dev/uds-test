@@ -1,6 +1,7 @@
 CREATE TABLE IF NOT EXISTS submissions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     student_id VARCHAR(100) NOT NULL,
+    raw_text TEXT,
     s3_key VARCHAR(500) NOT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
     score NUMERIC(4, 2),
@@ -21,9 +22,5 @@ CREATE TABLE IF NOT EXISTS outbox_events (
     aggregate_id VARCHAR(100) NOT NULL,
     topic VARCHAR(200) NOT NULL,
     payload JSONB NOT NULL,
-    status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
-
-CREATE INDEX IF NOT EXISTS idx_outbox_events_status
-    ON outbox_events (status);
