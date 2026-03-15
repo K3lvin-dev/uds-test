@@ -14,7 +14,7 @@ def main():
 
     # Dropa e recria banco via docker
     cmds = [
-        f"docker exec submissions_postgres psql -U postgres -d postgres -c \"{terminate_cmds}\"",  # noqa: E501
+        f'docker exec submissions_postgres psql -U postgres -d postgres -c "{terminate_cmds}"',  # noqa: E501
         "docker exec submissions_postgres psql -U postgres -d postgres -c 'DROP DATABASE IF EXISTS submissions_db;'",  # noqa: E501
         "docker exec submissions_postgres psql -U postgres -d postgres -c 'CREATE DATABASE submissions_db;'",  # noqa: E501
         "docker exec -i submissions_postgres psql -U postgres -d submissions_db < schema.sql",  # noqa: E501
