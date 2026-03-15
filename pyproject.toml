@@ -13,6 +13,11 @@ dependencies = [
     "pydantic-settings>=2.13.0",
 ]
 
+[project.scripts]
+start = "src.main:start"
+infra = "scripts.setup_infra:main"
+reset-db = "scripts.reset_db:main"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

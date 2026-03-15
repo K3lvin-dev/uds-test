@@ -1,0 +1,34 @@
+import uuid
+
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.features.submissions.create_submission.schemas import (
+    CreateSubmissionRequest,
+    CreateSubmissionResponse,
+)
+from src.platform import s3, sqs
+from src.platform.models import Submission
+
+
+async def create_submission(
+    request: CreateSubmissionRequest,
+    db: AsyncSession,
+) -> CreateSubmissionResponse:
+    submission_id = uuid.uuid4()
+    s3_key = f"submissions/{submission_id}.txt"
+
+    await s3.upload_text(s3_key, request.text)
+
+    submission = Submission(
+        id=submission_id,
+        student_id=request.student_id,
+        s3_key=s3_key,
+        status="PENDING",
+    )
+    db.add(submission)
+    await db.commit()
+    await db.refresh(submission)
+
+    await sqs.publish_message(str(submission_id))
+
+    return CreateSubmissionResponse.model_validate(submission)
