@@ -1,28 +1,14 @@
 import asyncio
 import json
-from typing import TYPE_CHECKING, TypedDict
 
 import boto3
 from botocore.config import Config
+from mypy_boto3_sqs import SQSClient
+from mypy_boto3_sqs.type_defs import MessageTypeDef
 
 from src.infra.config import settings
 
-if TYPE_CHECKING:
-    from mypy_boto3_sqs import SQSClient
-    from mypy_boto3_sqs.type_defs import MessageTypeDef
-else:
-    SQSClient = object
-    MessageTypeDef = dict
-
 _BOTO_CONFIG = Config(connect_timeout=5, read_timeout=30)
-
-
-class SQSMessage(TypedDict):
-    """Estrutura da mensagem SQS com ReceiptHandle e Body obrigatórios."""
-
-    MessageId: str
-    ReceiptHandle: str
-    Body: str
 
 
 def _make_client() -> SQSClient:
@@ -33,7 +19,7 @@ def _make_client() -> SQSClient:
         aws_access_key_id=settings.aws_access_key_id,
         aws_secret_access_key=settings.aws_secret_access_key,
         config=_BOTO_CONFIG,
-    )
+    )  # type: ignore
 
 
 def _publish_message_sync(submission_id: str) -> None:
