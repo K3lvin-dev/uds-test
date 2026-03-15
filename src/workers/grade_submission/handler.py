@@ -2,17 +2,27 @@ import asyncio
 import json
 import uuid
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import select, update
 
 from src.infra import s3
 from src.infra.database import async_session_factory
-from src.infra.models import Submission
+from src.infra.models import Submission, SubmissionStatus
 from src.workers.grade_submission.grader import grade
 
+if TYPE_CHECKING:
+    from mypy_boto3_sqs.type_defs import MessageTypeDef
+else:
+    MessageTypeDef = dict
 
-async def process(message: dict) -> None:
-    body = json.loads(message["Body"])
+
+async def process(message: MessageTypeDef) -> None:
+    body_str = message.get("Body")
+    if not body_str:
+        return
+
+    body = json.loads(body_str)
     submission_id = uuid.UUID(body["submission_id"])
 
     async with async_session_factory() as db:
@@ -24,13 +34,13 @@ async def process(message: dict) -> None:
         if not submission:
             return
 
-        if submission.status != "PENDING":
+        if submission.status != SubmissionStatus.PENDING:
             return
 
         await db.execute(
             update(Submission)
             .where(Submission.id == submission_id)
-            .values(status="PROCESSING", updated_at=datetime.now(UTC))
+            .values(status=SubmissionStatus.PROCESSING, updated_at=datetime.now(UTC))
         )
         await db.commit()
 
@@ -42,7 +52,7 @@ async def process(message: dict) -> None:
                 update(Submission)
                 .where(Submission.id == submission_id)
                 .values(
-                    status="GRADED",
+                    status=SubmissionStatus.GRADED,
                     score=grading.score,
                     criteria={k: v.model_dump() for k, v in grading.criteria.items()},
                     overall_feedback=grading.overall_feedback,
@@ -59,6 +69,6 @@ async def process(message: dict) -> None:
             await db.execute(
                 update(Submission)
                 .where(Submission.id == submission_id)
-                .values(status="ERROR", updated_at=datetime.now(UTC))
+                .values(status=SubmissionStatus.ERROR, updated_at=datetime.now(UTC))
             )
             await db.commit()

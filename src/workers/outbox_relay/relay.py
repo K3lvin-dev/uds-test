@@ -5,7 +5,7 @@ from sqlalchemy import delete, select, update
 
 from src.infra import s3, sqs
 from src.infra.database import async_session_factory
-from src.infra.models import OutboxEvent, Submission
+from src.infra.models import OutboxEvent, Submission, SubmissionStatus
 
 _POLL_INTERVAL = 5
 _MAX_RETRIES = 3
@@ -41,7 +41,7 @@ async def _retry_errors() -> None:
         result = await db.execute(
             select(Submission)
             .where(
-                Submission.status == "ERROR",
+                Submission.status == SubmissionStatus.ERROR,
                 Submission.retry_count < _MAX_RETRIES,
                 Submission.updated_at < retry_threshold,
             )
@@ -50,17 +50,17 @@ async def _retry_errors() -> None:
         submissions = result.scalars().all()
 
         for submission in submissions:
+            await sqs.publish_message(str(submission.id))
             await db.execute(
                 update(Submission)
                 .where(Submission.id == submission.id)
                 .values(
-                    status="PENDING",
+                    status=SubmissionStatus.PENDING,
                     retry_count=submission.retry_count + 1,
                     updated_at=datetime.now(UTC),
                 )
             )
             await db.commit()
-            await sqs.publish_message(str(submission.id))
             print(
                 f"[outbox_relay] submission {submission.id} -> retry "
                 f"{submission.retry_count + 1}/{_MAX_RETRIES}"

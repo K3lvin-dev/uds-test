@@ -14,12 +14,16 @@ async def _poll_loop() -> None:
         )
 
         for message in messages:
+            receipt_handle = message.get("ReceiptHandle")
+            if not receipt_handle:
+                continue
+
             try:
                 await process(message)
             except Exception as exc:
                 print(f"[grade_worker] WARNING: falha ao processar mensagem: {exc}")
             finally:
-                await sqs.delete_message(message["ReceiptHandle"])
+                await sqs.delete_message(receipt_handle)
 
 
 def main() -> None:

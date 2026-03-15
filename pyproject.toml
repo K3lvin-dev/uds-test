@@ -28,6 +28,8 @@ packages = ["src"]
 
 [dependency-groups]
 dev = [
+    "boto3-stubs[s3,sqs]>=1.42.68",
+    "pyright>=1.1.408",
     "ruff>=0.15.6",
 ]
 
@@ -52,3 +54,14 @@ quote-style = "double"
 indent-style = "space"
 skip-magic-trailing-comma = false
 line-ending = "auto"
+
+[tool.pyright]
+include = ["src"]
+typeCheckingMode = "basic"
+pythonVersion = "3.13"
+reportUnusedImport = "warning"
+reportUnusedVariable = "warning"
+reportMissingTypeStubs = "warning"
+reportUnknownMemberType = "none"
+reportUnknownParameterType = "none"
+reportUnknownVariableType = "none"

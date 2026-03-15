@@ -4,11 +4,13 @@ from decimal import Decimal
 
 from pydantic import BaseModel
 
+from src.infra.models import SubmissionStatus
+
 
 class SubmissionSummary(BaseModel):
     id: uuid.UUID
     student_id: str
-    status: str
+    status: SubmissionStatus
     score: Decimal | None
     created_at: datetime
     updated_at: datetime

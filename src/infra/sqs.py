@@ -1,16 +1,32 @@
 import asyncio
 import json
+from typing import TYPE_CHECKING, TypedDict
 
 import boto3
 from botocore.config import Config
 
 from src.infra.config import settings
 
+if TYPE_CHECKING:
+    from mypy_boto3_sqs import SQSClient
+    from mypy_boto3_sqs.type_defs import MessageTypeDef
+else:
+    SQSClient = object
+    MessageTypeDef = dict
+
 _BOTO_CONFIG = Config(connect_timeout=5, read_timeout=30)
 
 
-def _make_client():
-    return boto3.session.Session().client(
+class SQSMessage(TypedDict):
+    """Estrutura da mensagem SQS com ReceiptHandle e Body obrigatórios."""
+
+    MessageId: str
+    ReceiptHandle: str
+    Body: str
+
+
+def _make_client() -> SQSClient:
+    return boto3.Session().client(
         "sqs",
         endpoint_url=settings.aws_endpoint_url,
         region_name=settings.aws_default_region,
@@ -35,7 +51,7 @@ def _receive_messages_sync(
     max_messages: int = 1,
     visibility_timeout: int = 120,
     wait_seconds: int = 20,
-) -> list[dict]:
+) -> list[MessageTypeDef]:
     response = _make_client().receive_message(
         QueueUrl=settings.sqs_queue_url,
         MaxNumberOfMessages=max_messages,
@@ -49,7 +65,7 @@ async def receive_messages(
     max_messages: int = 1,
     visibility_timeout: int = 120,
     wait_seconds: int = 20,
-) -> list[dict]:
+) -> list[MessageTypeDef]:
     return await asyncio.to_thread(
         _receive_messages_sync, max_messages, visibility_timeout, wait_seconds
     )

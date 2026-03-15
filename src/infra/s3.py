@@ -1,15 +1,21 @@
 import asyncio
+from typing import TYPE_CHECKING
 
 import boto3
 from botocore.config import Config
 
 from src.infra.config import settings
 
+if TYPE_CHECKING:
+    from mypy_boto3_s3 import S3Client
+else:
+    S3Client = object
+
 _BOTO_CONFIG = Config(connect_timeout=5, read_timeout=30)
 
 
-def _make_client():
-    return boto3.session.Session().client(
+def _make_client() -> S3Client:
+    return boto3.Session().client(
         "s3",
         endpoint_url=settings.aws_endpoint_url,
         region_name=settings.aws_default_region,

@@ -14,10 +14,8 @@ def run(cmd):
 def main():
     print("--- Iniciando Infraestrutura ---")
 
-    # 1. Sobe os containers
     run("docker compose up -d")
 
-    # 2. Aguarda healthchecks
     print("Aguardando containers ficarem saudaveis...")
     max_attempts = 30
     for _attempt in range(max_attempts):
@@ -32,7 +30,7 @@ def main():
             1
             for line in lines
             if line.strip().endswith("healthy") and "unhealthy" not in line
-        )  # noqa: E501
+        )
         if healthy_count >= 2:
             break
         time.sleep(2)
