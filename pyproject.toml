@@ -17,6 +17,7 @@ dependencies = [
 start = "src.main:start"
 infra = "scripts.setup_infra:main"
 reset-db = "scripts.reset_db:main"
+format = "scripts:format_code"
 
 [build-system]
 requires = ["hatchling"]
@@ -44,7 +45,7 @@ select = [
     "UP", # pyupgrade
     "SIM",# flake8-simplify
 ]
-ignore = []
+ignore = ["B008"]
 
 [tool.ruff.format]
 quote-style = "double"
