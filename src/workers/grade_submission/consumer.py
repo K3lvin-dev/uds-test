@@ -20,10 +20,9 @@ async def _poll_loop() -> None:
 
             try:
                 await process(message)
+                await sqs.delete_message(receipt_handle)
             except Exception as exc:
                 print(f"[grade_worker] WARNING: falha ao processar mensagem: {exc}")
-            finally:
-                await sqs.delete_message(receipt_handle)
 
 
 def main() -> None:
