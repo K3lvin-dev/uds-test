@@ -15,3 +15,11 @@ CREATE INDEX IF NOT EXISTS idx_submissions_student_id
 
 CREATE INDEX IF NOT EXISTS idx_submissions_student_id_created_at
     ON submissions (student_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS outbox_events (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    aggregate_id VARCHAR(100) NOT NULL,
+    topic VARCHAR(200) NOT NULL,
+    payload JSONB NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);

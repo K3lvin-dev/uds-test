@@ -6,9 +6,13 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-from src.platform.config import settings
+from src.infra.config import settings
 
-engine = create_async_engine(settings.database_url, echo=False)
+engine = create_async_engine(
+    settings.database_url,
+    echo=False,
+    connect_args={"command_timeout": 10},
+)
 
 async_session_factory = async_sessionmaker(engine, expire_on_commit=False)
 
