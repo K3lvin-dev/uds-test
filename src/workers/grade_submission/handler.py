@@ -2,19 +2,14 @@ import asyncio
 import json
 import uuid
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
 
+from mypy_boto3_sqs.type_defs import MessageTypeDef
 from sqlalchemy import select, update
 
 from src.infra import s3
 from src.infra.database import async_session_factory
 from src.infra.models import Submission, SubmissionStatus
 from src.workers.grade_submission.grader import grade
-
-if TYPE_CHECKING:
-    from mypy_boto3_sqs.type_defs import MessageTypeDef
-else:
-    MessageTypeDef = dict
 
 
 async def process(message: MessageTypeDef) -> None:
