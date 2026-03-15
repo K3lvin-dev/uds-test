@@ -2,21 +2,22 @@ import asyncio
 import json
 
 import boto3
-from botocore.client import BaseClient
 
 from src.infra.config import settings
 
-_client: BaseClient = boto3.client(
-    "sqs",
-    endpoint_url=settings.aws_endpoint_url,
-    region_name=settings.aws_default_region,
-    aws_access_key_id=settings.aws_access_key_id,
-    aws_secret_access_key=settings.aws_secret_access_key,
-)
+
+def _make_client():
+    return boto3.session.Session().client(
+        "sqs",
+        endpoint_url=settings.aws_endpoint_url,
+        region_name=settings.aws_default_region,
+        aws_access_key_id=settings.aws_access_key_id,
+        aws_secret_access_key=settings.aws_secret_access_key,
+    )
 
 
 def _publish_message_sync(submission_id: str) -> None:
-    _client.send_message(
+    _make_client().send_message(
         QueueUrl=settings.sqs_queue_url,
         MessageBody=json.dumps({"submission_id": submission_id}),
     )
@@ -31,7 +32,7 @@ def _receive_messages_sync(
     visibility_timeout: int = 120,
     wait_seconds: int = 20,
 ) -> list[dict]:
-    response = _client.receive_message(
+    response = _make_client().receive_message(
         QueueUrl=settings.sqs_queue_url,
         MaxNumberOfMessages=max_messages,
         WaitTimeSeconds=wait_seconds,
@@ -51,7 +52,7 @@ async def receive_messages(
 
 
 def _delete_message_sync(receipt_handle: str) -> None:
-    _client.delete_message(
+    _make_client().delete_message(
         QueueUrl=settings.sqs_queue_url,
         ReceiptHandle=receipt_handle,
     )
