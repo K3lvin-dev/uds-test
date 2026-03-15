@@ -6,7 +6,7 @@ from src.features.submissions.create_submission.schemas import (
     CreateSubmissionRequest,
     CreateSubmissionResponse,
 )
-from src.platform.models import OutboxEvent, Submission
+from src.infra.models import OutboxEvent, Submission
 
 
 async def create_submission(

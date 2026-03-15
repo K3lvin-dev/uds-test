@@ -6,7 +6,7 @@ from fastapi import APIRouter, FastAPI
 from src.features.submissions.create_submission.router import (
     setup as setup_create_submission,
 )
-from src.workers.outbox_relay import main as outbox_relay
+from src.workers.outbox_relay.relay import main as outbox_relay
 
 
 def create_app() -> FastAPI:

@@ -4,7 +4,7 @@ import json
 import boto3
 from botocore.client import BaseClient
 
-from src.platform.config import settings
+from src.infra.config import settings
 
 _client: BaseClient = boto3.client(
     "sqs",

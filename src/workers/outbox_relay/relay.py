@@ -2,9 +2,9 @@ import asyncio
 
 from sqlalchemy import delete, select
 
-from src.platform import s3, sqs
-from src.platform.database import async_session_factory
-from src.platform.models import OutboxEvent
+from src.infra import s3, sqs
+from src.infra.database import async_session_factory
+from src.infra.models import OutboxEvent
 
 _POLL_INTERVAL = 5
 

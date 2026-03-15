@@ -6,7 +6,7 @@ from src.features.submissions.create_submission.schemas import (
     CreateSubmissionRequest,
     CreateSubmissionResponse,
 )
-from src.platform.database import get_db
+from src.infra.database import get_db
 
 
 def setup(router: APIRouter) -> None:
