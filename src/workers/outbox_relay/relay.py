@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import delete, select, update
 
@@ -35,7 +35,7 @@ async def _process_one() -> bool:
 
 
 async def _retry_errors() -> None:
-    retry_threshold = datetime.now(timezone.utc) - timedelta(minutes=_RETRY_AFTER_MINUTES)
+    retry_threshold = datetime.now(UTC) - timedelta(minutes=_RETRY_AFTER_MINUTES)
 
     async with async_session_factory() as db:
         result = await db.execute(
@@ -56,7 +56,7 @@ async def _retry_errors() -> None:
                 .values(
                     status="PENDING",
                     retry_count=submission.retry_count + 1,
-                    updated_at=datetime.now(timezone.utc),
+                    updated_at=datetime.now(UTC),
                 )
             )
             await db.commit()

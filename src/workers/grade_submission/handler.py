@@ -1,7 +1,7 @@
 import asyncio
 import json
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import select, update
 
@@ -17,9 +17,7 @@ async def process(message: dict) -> None:
 
     async with async_session_factory() as db:
         result = await db.execute(
-            select(Submission)
-            .where(Submission.id == submission_id)
-            .with_for_update()
+            select(Submission).where(Submission.id == submission_id).with_for_update()
         )
         submission = result.scalar_one_or_none()
 
@@ -32,7 +30,7 @@ async def process(message: dict) -> None:
         await db.execute(
             update(Submission)
             .where(Submission.id == submission_id)
-            .values(status="PROCESSING", updated_at=datetime.now(timezone.utc))
+            .values(status="PROCESSING", updated_at=datetime.now(UTC))
         )
         await db.commit()
 
@@ -48,17 +46,19 @@ async def process(message: dict) -> None:
                     score=grading.score,
                     criteria={k: v.model_dump() for k, v in grading.criteria.items()},
                     overall_feedback=grading.overall_feedback,
-                    updated_at=datetime.now(timezone.utc),
+                    updated_at=datetime.now(UTC),
                 )
             )
             await db.commit()
-            print(f"[grade_worker] submission {submission_id} graded — score: {grading.score}")
+            print(
+                f"[grade_worker] submission {submission_id} graded — score: {grading.score}"
+            )
 
         except Exception as exc:
             print(f"[grade_worker] ERROR grading {submission_id}: {exc}")
             await db.execute(
                 update(Submission)
                 .where(Submission.id == submission_id)
-                .values(status="ERROR", updated_at=datetime.now(timezone.utc))
+                .values(status="ERROR", updated_at=datetime.now(UTC))
             )
             await db.commit()
