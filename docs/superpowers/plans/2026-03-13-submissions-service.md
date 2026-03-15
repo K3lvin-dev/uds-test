@@ -520,7 +520,7 @@ Saida esperada: `Platform OK` sem erros de importacao.
 
 ### Task 14: src/features/submissions/create_submission/schemas.py
 
-- [ ] Crie `src/features/submissions/create_submission/schemas.py`:
+- [x] Crie `src/features/submissions/create_submission/schemas.py`:
 
 ```python
 import uuid
@@ -547,7 +547,7 @@ class CreateSubmissionResponse(BaseModel):
 
 ### Task 15: src/features/submissions/create_submission/handler.py
 
-- [ ] Crie `src/features/submissions/create_submission/handler.py`:
+- [x] Crie `src/features/submissions/create_submission/handler.py`:
 
 ```python
 import uuid
@@ -590,7 +590,7 @@ async def create_submission(
 
 ### Task 16: src/features/submissions/create_submission/router.py
 
-- [ ] Crie `src/features/submissions/create_submission/router.py`:
+- [x] Crie `src/features/submissions/create_submission/router.py`:
 
 ```python
 from fastapi import APIRouter, Depends, Response
@@ -620,7 +620,7 @@ def setup(router: APIRouter) -> None:
 
 ### Task 17: src/main.py (skeleton com create)
 
-- [ ] Crie `src/main.py`:
+- [x] Crie `src/main.py`:
 
 ```python
 from fastapi import FastAPI
@@ -639,7 +639,7 @@ setup_create(router)
 app.include_router(router)
 ```
 
-- [ ] Verifique que a API sobe:
+- [x] Verifique que a API sobe:
 
 ```bash
 uv run uvicorn src.main:app --reload --port 8000
@@ -647,7 +647,7 @@ uv run uvicorn src.main:app --reload --port 8000
 
 Saida esperada: `Application startup complete.` sem erros.
 
-- [ ] Teste o endpoint (em outro terminal):
+- [x] Teste o endpoint (em outro terminal):
 
 ```bash
 curl -s -X POST http://localhost:8000/api/v1/submissions/ \
@@ -657,7 +657,7 @@ curl -s -X POST http://localhost:8000/api/v1/submissions/ \
 
 Saida esperada: JSON com `id`, `student_id`, `status: "PENDING"`, `created_at`.
 
-- [ ] Verifique o header `Location`:
+- [x] Verifique o header `Location`:
 
 ```bash
 curl -si -X POST http://localhost:8000/api/v1/submissions/ \
@@ -667,7 +667,7 @@ curl -si -X POST http://localhost:8000/api/v1/submissions/ \
 
 Saida esperada: `location: /api/v1/submissions/<uuid>`.
 
-- [ ] Verifique que o objeto foi salvo no S3:
+- [x] Verifique que o objeto foi salvo no S3:
 
 ```bash
 docker exec submissions_localstack awslocal s3 ls s3://submissions-bucket/submissions/
@@ -675,7 +675,7 @@ docker exec submissions_localstack awslocal s3 ls s3://submissions-bucket/submis
 
 Saida esperada: arquivo `.txt` listado.
 
-- [ ] Verifique que a mensagem foi enviada para o SQS:
+- [x] Verifique que a mensagem foi enviada para o SQS:
 
 ```bash
 docker exec submissions_localstack awslocal sqs get-queue-attributes \
@@ -693,7 +693,7 @@ Saida esperada: `ApproximateNumberOfMessages: 1`.
 
 ### Task 18: src/features/submissions/get_submission/schemas.py
 
-- [ ] Crie `src/features/submissions/get_submission/schemas.py`:
+- [x] Crie `src/features/submissions/get_submission/schemas.py`:
 
 ```python
 import uuid
@@ -727,7 +727,7 @@ class SubmissionDetailResponse(BaseModel):
 
 ### Task 19: src/features/submissions/get_submission/handler.py
 
-- [ ] Crie `src/features/submissions/get_submission/handler.py`:
+- [x] Crie `src/features/submissions/get_submission/handler.py`:
 
 ```python
 import uuid
@@ -759,7 +759,7 @@ async def get_submission(
 
 ### Task 20: src/features/submissions/get_submission/router.py
 
-- [ ] Crie `src/features/submissions/get_submission/router.py`:
+- [x] Crie `src/features/submissions/get_submission/router.py`:
 
 ```python
 import uuid
@@ -785,7 +785,7 @@ def setup(router: APIRouter) -> None:
 
 ### Task 21: src/features/submissions/list_submissions/schemas.py
 
-- [ ] Crie `src/features/submissions/list_submissions/schemas.py`:
+- [x] Crie `src/features/submissions/list_submissions/schemas.py`:
 
 ```python
 import uuid
@@ -817,7 +817,7 @@ class ListSubmissionsResponse(BaseModel):
 
 ### Task 22: src/features/submissions/list_submissions/handler.py
 
-- [ ] Crie `src/features/submissions/list_submissions/handler.py`:
+- [x] Crie `src/features/submissions/list_submissions/handler.py`:
 
 ```python
 from sqlalchemy import func, select
@@ -866,7 +866,7 @@ async def list_submissions(
 
 ### Task 23: src/features/submissions/list_submissions/router.py
 
-- [ ] Crie `src/features/submissions/list_submissions/router.py`:
+- [x] Crie `src/features/submissions/list_submissions/router.py`:
 
 ```python
 from fastapi import APIRouter, Depends, Query
@@ -892,7 +892,7 @@ def setup(router: APIRouter) -> None:
 
 ### Task 24: Atualizar src/main.py com todos os slices
 
-- [ ] Atualize `src/main.py`:
+- [x] Atualize `src/main.py`:
 
 ```python
 from fastapi import FastAPI
@@ -915,7 +915,7 @@ setup_get(router)
 app.include_router(router)
 ```
 
-- [ ] Reinicie a API e teste os 3 endpoints:
+- [x] Reinicie a API e teste os 3 endpoints:
 
 ```bash
 # 1. Criar submission
@@ -938,7 +938,7 @@ Saida esperada para cada:
 2. `200` com todos os campos (score=null enquanto PENDING)
 3. `200` com `items`, `total`, `page`, `per_page`
 
-- [ ] Teste o 404:
+- [x] Teste o 404:
 
 ```bash
 curl -s http://localhost:8000/api/v1/submissions/00000000-0000-0000-0000-000000000000 | python3 -m json.tool
@@ -954,7 +954,7 @@ Saida esperada: `{"detail": "Submission not found"}` com status 404.
 
 ### Task 25: src/worker/grade_submission/schemas.py
 
-- [ ] Crie `src/worker/grade_submission/schemas.py`:
+- [x] Crie `src/worker/grade_submission/schemas.py`:
 
 ```python
 from pydantic import BaseModel, Field
@@ -975,7 +975,7 @@ class GradingResult(BaseModel):
 
 ### Task 26: src/worker/grade_submission/grader.py
 
-- [ ] Crie `src/worker/grade_submission/grader.py`:
+- [x] Crie `src/worker/grade_submission/grader.py`:
 
 ```python
 from google import genai
@@ -1025,7 +1025,7 @@ def grade(text: str) -> GradingResult:
 
 ### Task 27: src/worker/grade_submission/handler.py
 
-- [ ] Crie `src/worker/grade_submission/handler.py`:
+- [x] Crie `src/worker/grade_submission/handler.py`:
 
 ```python
 import json
@@ -1098,7 +1098,7 @@ async def process(message: dict) -> None:
 
 ### Task 28: src/worker/grade_submission/consumer.py
 
-- [ ] Crie `src/worker/grade_submission/consumer.py`:
+- [x] Crie `src/worker/grade_submission/consumer.py`:
 
 ```python
 import asyncio
@@ -1135,7 +1135,7 @@ async def _poll_loop() -> None:
 
 ### Task 29: src/worker.py
 
-- [ ] Crie `src/worker.py`:
+- [x] Crie `src/worker.py`:
 
 ```python
 from src.worker.grade_submission.consumer import setup
@@ -1148,19 +1148,19 @@ if __name__ == "__main__":
 
 ### Task 30: Testar o worker end-to-end
 
-- [ ] Em terminal 1 (API rodando):
+- [x] Em terminal 1 (API rodando):
 
 ```bash
 uv run uvicorn src.main:app --reload --port 8000
 ```
 
-- [ ] Em terminal 2 (worker):
+- [x] Em terminal 2 (worker):
 
 ```bash
 uv run python -m src.worker
 ```
 
-- [ ] Em terminal 3, crie uma submission e acompanhe o ciclo completo:
+- [x] Em terminal 3, crie uma submission e acompanhe o ciclo completo:
 
 ```bash
 # Criar
@@ -1186,7 +1186,7 @@ Saida esperada: status `GRADED`, `score` preenchido, `criteria` com os 4 criteri
 
 ### Task 31: README.md
 
-- [ ] Substitua o conteudo de `README.md`:
+- [x] Substitua o conteudo de `README.md`:
 
 ```markdown
 # Submissions Service
