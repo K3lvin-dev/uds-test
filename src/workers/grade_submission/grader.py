@@ -38,4 +38,6 @@ def grade(text: str) -> GradingResult:
             "response_json_schema": GradingResult.model_json_schema(),
         },
     )
+    if response.text is None:
+        raise ValueError("Gemini returned empty response")
     return GradingResult.model_validate_json(response.text)

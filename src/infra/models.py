@@ -1,11 +1,19 @@
 import uuid
 from datetime import datetime
 from decimal import Decimal
+from enum import StrEnum
 from typing import Any
 
 from sqlalchemy import DateTime, Integer, Numeric, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+
+class SubmissionStatus(StrEnum):
+    PENDING = "PENDING"
+    PROCESSING = "PROCESSING"
+    GRADED = "GRADED"
+    ERROR = "ERROR"
 
 
 class Base(DeclarativeBase):
@@ -20,7 +28,9 @@ class Submission(Base):
     )
     student_id: Mapped[str] = mapped_column(String(100), nullable=False)
     s3_key: Mapped[str] = mapped_column(String(500), nullable=False)
-    status: Mapped[str] = mapped_column(String(20), nullable=False, default="PENDING")
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default=SubmissionStatus.PENDING
+    )
     retry_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     score: Mapped[Decimal | None] = mapped_column(Numeric(4, 2), nullable=True)
     criteria: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)

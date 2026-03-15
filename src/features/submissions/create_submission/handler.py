@@ -6,7 +6,7 @@ from src.features.submissions.create_submission.schemas import (
     CreateSubmissionRequest,
     CreateSubmissionResponse,
 )
-from src.infra.models import OutboxEvent, Submission
+from src.infra.models import OutboxEvent, Submission, SubmissionStatus
 
 
 async def create_submission(
@@ -20,7 +20,7 @@ async def create_submission(
         id=submission_id,
         student_id=request.student_id,
         s3_key=s3_key,
-        status="PENDING",
+        status=SubmissionStatus.PENDING,
     )
     outbox_event = OutboxEvent(
         aggregate_id=str(submission_id),
