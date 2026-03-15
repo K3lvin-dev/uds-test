@@ -29,6 +29,12 @@ async def create_submission(
     await db.commit()
     await db.refresh(submission)
 
-    await sqs.publish_message(str(submission_id))
+    try:
+        await sqs.publish_message(str(submission_id))
+    except Exception as exc:
+        # Submission já foi commitada. Loga o erro mas retorna sucesso ao cliente —
+        # a mensagem pode ser reenfileirada manualmente ou via retry. Para produção,
+        # considerar transactional outbox para garantir entrega.
+        print(f"[create_submission] WARNING: falha ao publicar SQS para {submission_id}: {exc}")
 
     return CreateSubmissionResponse.model_validate(submission)

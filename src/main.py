@@ -1,3 +1,4 @@
+import uvicorn
 from fastapi import FastAPI
 from fastapi.routing import APIRouter
 
@@ -15,6 +16,4 @@ app.include_router(router)
 
 
 def start():
-    import uvicorn
-
     uvicorn.run("src.main:app", host="0.0.0.0", port=8000, reload=True)

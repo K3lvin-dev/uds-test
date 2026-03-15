@@ -17,14 +17,21 @@ def main():
     
     # 2. Aguarda healthchecks
     print("Aguardando containers ficarem saudaveis...")
-    for _ in range(30):
-        result = subprocess.run("docker compose ps --format json", shell=True, capture_output=True, text=True)
-        if '"Health":"healthy"' in result.stdout or "healthy" in result.stdout:
-             # Verifica se ambos estao healthy (simplificado)
-             if result.stdout.count("healthy") >= 2:
-                 break
+    max_attempts = 30
+    for attempt in range(max_attempts):
+        result = subprocess.run(
+            "docker compose ps --format '{{.Name}} {{.Health}}'",
+            shell=True, capture_output=True, text=True,
+        )
+        lines = result.stdout.strip().splitlines()
+        healthy_count = sum(1 for line in lines if line.strip().endswith("healthy") and "unhealthy" not in line)
+        if healthy_count >= 2:
+            break
         time.sleep(2)
-    
+    else:
+        print("Erro: containers nao ficaram saudaveis a tempo.")
+        sys.exit(1)
+
     print("--- Infraestrutura Pronta ---")
 
 if __name__ == "__main__":
