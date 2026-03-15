@@ -12,9 +12,7 @@ async def get_submission(
     submission_id: uuid.UUID,
     db: AsyncSession,
 ) -> SubmissionDetailResponse:
-    result = await db.execute(
-        select(Submission).where(Submission.id == submission_id)
-    )
+    result = await db.execute(select(Submission).where(Submission.id == submission_id))
     submission = result.scalar_one_or_none()
 
     if not submission:

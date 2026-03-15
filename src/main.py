@@ -17,7 +17,7 @@ def create_app() -> FastAPI:
 
     api_router = APIRouter(prefix="/api/v1/submissions")
     setup_create_submission(api_router)
-    setup_list_submissions(api_router)   # GET / deve vir antes de GET /{id}
+    setup_list_submissions(api_router)  # GET / deve vir antes de GET /{id}
     setup_get_submission(api_router)
     app.include_router(api_router)
 

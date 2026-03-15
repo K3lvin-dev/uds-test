@@ -18,21 +18,25 @@ async def list_submissions(
 
     total = (
         await db.execute(
-            select(func.count()).select_from(Submission).where(
-                Submission.student_id == student_id
-            )
+            select(func.count())
+            .select_from(Submission)
+            .where(Submission.student_id == student_id)
         )
     ).scalar_one()
 
     rows = (
-        await db.execute(
-            select(Submission)
-            .where(Submission.student_id == student_id)
-            .order_by(Submission.created_at.desc())
-            .offset(offset)
-            .limit(per_page)
+        (
+            await db.execute(
+                select(Submission)
+                .where(Submission.student_id == student_id)
+                .order_by(Submission.created_at.desc())
+                .offset(offset)
+                .limit(per_page)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     return ListSubmissionsResponse(
         items=[SubmissionSummary.model_validate(s) for s in rows],
