@@ -4,6 +4,12 @@ from fastapi import APIRouter, FastAPI
 from src.features.submissions.create_submission.router import (
     setup as setup_create_submission,
 )
+from src.features.submissions.get_submission.router import (
+    setup as setup_get_submission,
+)
+from src.features.submissions.list_submissions.router import (
+    setup as setup_list_submissions,
+)
 
 
 def create_app() -> FastAPI:
@@ -11,6 +17,8 @@ def create_app() -> FastAPI:
 
     api_router = APIRouter(prefix="/api/v1/submissions")
     setup_create_submission(api_router)
+    setup_list_submissions(api_router)   # GET / deve vir antes de GET /{id}
+    setup_get_submission(api_router)
     app.include_router(api_router)
 
     @app.get("/health")
