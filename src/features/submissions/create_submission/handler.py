@@ -1,3 +1,4 @@
+import json
 import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -6,8 +7,8 @@ from src.features.submissions.create_submission.schemas import (
     CreateSubmissionRequest,
     CreateSubmissionResponse,
 )
-from src.platform import s3, sqs
-from src.platform.models import Submission
+from src.platform import s3
+from src.platform.models import OutboxEvent, Submission
 
 
 async def create_submission(
@@ -25,16 +26,16 @@ async def create_submission(
         s3_key=s3_key,
         status="PENDING",
     )
+    outbox_event = OutboxEvent(
+        aggregate_id=str(submission_id),
+        topic="submissions-queue",
+        payload=json.loads(json.dumps({"submission_id": str(submission_id)})),
+        status="PENDING",
+    )
+
     db.add(submission)
+    db.add(outbox_event)
     await db.commit()
     await db.refresh(submission)
-
-    try:
-        await sqs.publish_message(str(submission_id))
-    except Exception as exc:
-        # Submission já foi commitada. Loga o erro mas retorna sucesso ao cliente —
-        # a mensagem pode ser reenfileirada manualmente ou via retry. Para produção,
-        # considerar transactional outbox para garantir entrega.
-        print(f"[create_submission] WARNING: falha ao publicar SQS para {submission_id}: {exc}")
 
     return CreateSubmissionResponse.model_validate(submission)
