@@ -1,10 +1,10 @@
 import uuid
-from datetime import datetime
 from decimal import Decimal
 
 from pydantic import BaseModel
 
 from src.infra.models import SubmissionStatus
+from src.infra.types import BRTDatetime
 
 
 class SubmissionSummary(BaseModel):
@@ -12,8 +12,8 @@ class SubmissionSummary(BaseModel):
     student_id: str
     status: SubmissionStatus
     score: Decimal | None
-    created_at: datetime
-    updated_at: datetime
+    created_at: BRTDatetime
+    updated_at: BRTDatetime
 
     model_config = {"from_attributes": True}
 

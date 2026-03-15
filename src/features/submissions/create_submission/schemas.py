@@ -1,9 +1,9 @@
 import uuid
-from datetime import datetime
 
 from pydantic import BaseModel, Field
 
 from src.infra.models import SubmissionStatus
+from src.infra.types import BRTDatetime
 
 
 class CreateSubmissionRequest(BaseModel):
@@ -15,6 +15,6 @@ class CreateSubmissionResponse(BaseModel):
     id: uuid.UUID
     student_id: str
     status: SubmissionStatus
-    created_at: datetime
+    created_at: BRTDatetime
 
     model_config = {"from_attributes": True}
