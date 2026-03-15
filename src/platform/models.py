@@ -19,7 +19,6 @@ class Submission(Base):
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     student_id: Mapped[str] = mapped_column(String(100), nullable=False)
-    raw_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     s3_key: Mapped[str] = mapped_column(String(500), nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="PENDING")
     score: Mapped[Decimal | None] = mapped_column(Numeric(4, 2), nullable=True)

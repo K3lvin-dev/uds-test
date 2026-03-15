@@ -19,14 +19,13 @@ async def create_submission(
     submission = Submission(
         id=submission_id,
         student_id=request.student_id,
-        raw_text=request.text,
         s3_key=s3_key,
         status="PENDING",
     )
     outbox_event = OutboxEvent(
         aggregate_id=str(submission_id),
         topic="submissions-queue",
-        payload={"submission_id": str(submission_id)},
+        payload={"submission_id": str(submission_id), "text": request.text},
     )
 
     db.add(submission)

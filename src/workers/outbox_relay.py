@@ -1,11 +1,10 @@
 import asyncio
 
-from sqlalchemy import cast, delete, select, update
-from sqlalchemy.dialects.postgresql import UUID as PgUUID
+from sqlalchemy import delete, select
 
 from src.platform import s3, sqs
 from src.platform.database import async_session_factory
-from src.platform.models import OutboxEvent, Submission
+from src.platform.models import OutboxEvent
 
 _POLL_INTERVAL = 5
 
@@ -16,30 +15,23 @@ async def _relay_loop() -> None:
         try:
             async with async_session_factory() as db:
                 result = await db.execute(
-                    select(OutboxEvent, Submission)
-                    .join(
-                        Submission,
-                        Submission.id
-                        == cast(OutboxEvent.aggregate_id, PgUUID(as_uuid=True)),
-                    )
-                    .with_for_update(skip_locked=True)
+                    select(OutboxEvent).with_for_update(skip_locked=True)
                 )
-                rows = result.all()
+                events = result.scalars().all()
 
-                for event, submission in rows:
+                for event in events:
                     try:
-                        await s3.upload_text(submission.s3_key, submission.raw_text)
-                        await sqs.publish_message(str(submission.id))
-                        await db.execute(
-                            update(Submission)
-                            .where(Submission.id == submission.id)
-                            .values(raw_text=None)
-                        )
+                        submission_id = event.payload["submission_id"]
+                        text = event.payload["text"]
+                        s3_key = f"submissions/{submission_id}.txt"
+
+                        await s3.upload_text(s3_key, text)
+                        await sqs.publish_message(submission_id)
                         await db.execute(
                             delete(OutboxEvent).where(OutboxEvent.id == event.id)
                         )
                         await db.commit()
-                        print(f"[outbox_relay] event {event.id} -> deleted")
+                        print(f"[outbox_relay] event {event.id} -> processed")
                     except Exception as exc:
                         await db.rollback()
                         print(
@@ -53,7 +45,10 @@ async def _relay_loop() -> None:
 
 
 def main() -> None:
-    asyncio.run(_relay_loop())
+    try:
+        asyncio.run(_relay_loop())
+    except (KeyboardInterrupt, asyncio.exceptions.CancelledError):
+        print("[outbox_relay] Stopped.")
 
 
 if __name__ == "__main__":
