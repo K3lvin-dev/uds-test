@@ -12,9 +12,7 @@ _POLL_INTERVAL = 5
 async def _process_one() -> bool:
     async with async_session_factory() as db:
         result = await db.execute(
-            select(OutboxEvent)
-            .with_for_update(skip_locked=True)
-            .limit(1)
+            select(OutboxEvent).with_for_update(skip_locked=True).limit(1)
         )
         event = result.scalar_one_or_none()
 
