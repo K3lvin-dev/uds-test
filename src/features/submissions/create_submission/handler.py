@@ -6,7 +6,8 @@ from src.features.submissions.create_submission.schemas import (
     CreateSubmissionRequest,
     CreateSubmissionResponse,
 )
-from src.infra.models import OutboxEvent, Submission, SubmissionStatus
+from src.infra import s3, sqs
+from src.infra.models import Submission, SubmissionStatus
 
 
 async def create_submission(
@@ -16,21 +17,18 @@ async def create_submission(
     submission_id = uuid.uuid4()
     s3_key = f"submissions/{submission_id}.txt"
 
+    await s3.upload_text(s3_key, request.text)
+
     submission = Submission(
         id=submission_id,
         student_id=request.student_id,
         s3_key=s3_key,
         status=SubmissionStatus.PENDING,
     )
-    outbox_event = OutboxEvent(
-        aggregate_id=str(submission_id),
-        topic="submissions-queue",
-        payload={"submission_id": str(submission_id), "text": request.text},
-    )
-
     db.add(submission)
-    db.add(outbox_event)
     await db.commit()
     await db.refresh(submission)
+
+    await sqs.publish_message(str(submission_id))
 
     return CreateSubmissionResponse.model_validate(submission)

@@ -4,7 +4,7 @@ from decimal import Decimal
 from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import DateTime, Integer, Numeric, String, Text, func
+from sqlalchemy import DateTime, Numeric, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -31,7 +31,6 @@ class Submission(Base):
     status: Mapped[SubmissionStatus] = mapped_column(
         String(20), nullable=False, default=SubmissionStatus.PENDING
     )
-    retry_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     score: Mapped[Decimal | None] = mapped_column(Numeric(4, 2), nullable=True)
     criteria: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     overall_feedback: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -40,18 +39,4 @@ class Submission(Base):
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
-    )
-
-
-class OutboxEvent(Base):
-    __tablename__ = "outbox_events"
-
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
-    aggregate_id: Mapped[str] = mapped_column(String(100), nullable=False)
-    topic: Mapped[str] = mapped_column(String(200), nullable=False)
-    payload: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
     )
