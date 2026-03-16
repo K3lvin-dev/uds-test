@@ -265,36 +265,55 @@ Hoje, criar uma submission envolve 3 operações em sequência:
 3. Publicar mensagem com submission_id → SQS
 ```
 
-Essas 3 operações **não são atômicas**. Se a aplicação travar ou perder conexão entre o passo 2 e o 3, a submission fica gravada no banco com status `PENDING` para sempre  nunca vai ser corrigida, e o estudante não recebe nenhum retorno.
+Essas 3 operações **não são atômicas**. Se a aplicação travar ou perder conexão entre o passo 2 e o 3, a submission fica gravada no banco com status `PENDING` para sempre. Nunca vai ser corrigida e o estudante não recebe nenhum retorno.
 
-#### A solução com DynamoDB + Streams
+#### As duas opções de solução
 
-A ideia é simples: em vez de publicar no SQS diretamente, a Lambda da API **grava um registro no DynamoDB** junto com a submission no PostgreSQL. Aí entra o **DynamoDB Streams**: é um recurso nativo da AWS que monitora a tabela e, a cada inserção, dispara automaticamente uma Lambda.
+**Opção 1: Substituir o PostgreSQL por DynamoDB**
 
-O fluxo fica assim:
+Com DynamoDB como banco principal, é possível habilitar o **DynamoDB Streams**: um recurso nativo que monitora a tabela e dispara uma Lambda automaticamente a cada INSERT. Essa Lambda publica a mensagem no SQS sem nenhum polling, sem agendamento, sem processo rodando continuamente.
 
 ```
 Lambda (API)
     |
-    |── INSERT submission (PENDING) ──> PostgreSQL
-    |── PUT outbox_event ──────────────> DynamoDB
-                                              |
-                                    (DynamoDB Streams detecta o PUT)
-                                              |
-                                              v
-                                       Lambda (Relay)
-                                              |
-                                              v
-                                            SQS
+    v
+INSERT submission (PENDING) → DynamoDB
+                                   |
+                        (Streams detecta o INSERT)
+                                   |
+                                   v
+                            Lambda (Relay)
+                                   |
+                                   v
+                                  SQS
 ```
 
-O ponto chave: a Lambda da API não se preocupa mais em publicar no SQS. Ela só grava no DynamoDB  e a partir daí a AWS cuida do resto automaticamente. Não tem polling, não tem processo rodando a cada minuto, não tem cron job. O Streams é event-driven: reagiu ao INSERT, disparou, acabou.
+A atomicidade está garantida porque existe apenas um banco. Se o INSERT no DynamoDB falhar, nada foi publicado no SQS. Se der certo, o Streams dispara e o resto acontece automaticamente.
 
-#### Por que isso resolve o problema
+**Opção 2: Manter o PostgreSQL com tabela outbox no mesmo banco**
 
-Antes, a falha podia acontecer entre o INSERT no banco e o publish no SQS  uma janela de risco real. Com esse padrão, o risco fica restrito à janela entre o INSERT no PostgreSQL e o PUT no DynamoDB, que são duas operações muito rápidas e locais. E mesmo que o PUT no DynamoDB falhe, a Lambda pode fazer retry sem efeito colateral nenhum  o DynamoDB é idempotente por chave.
+A tabela `outbox_events` fica no mesmo PostgreSQL, gravada dentro da **mesma transação** que o INSERT da submission. Isso garante atomicidade: ou os dois registros são gravados juntos ou nenhum é. Uma Lambda agendada via EventBridge (a cada 1 minuto, por exemplo) lê os eventos pendentes na tabela e publica no SQS.
 
-Não está implementado aqui porque localmente a chance de falha nessa janela é negligenciável. Em produção com tráfego real e múltiplas instâncias, valeria a pena.
+```
+Lambda (API)
+    |
+    v
+Transação PostgreSQL
+    |── INSERT submission (PENDING)
+    └── INSERT outbox_event
+                |
+        (EventBridge a cada 1 min)
+                |
+                v
+         Lambda (Relay)
+                |
+                v
+               SQS
+```
+
+A desvantagem é o polling periódico: há uma latência de até 1 minuto entre a criação da submission e o enfileiramento para correção.
+
+Não está implementado neste projeto porque localmente a chance de falha entre o INSERT e o publish no SQS é negligenciável. Em produção com tráfego real, uma das duas abordagens seria necessária.
 
 ### Dead Letter Queue (DLQ)
 
