@@ -145,6 +145,12 @@ uv run infra
 
 Aguarda automaticamente os containers ficarem healthy. O script `scripts/init-aws.sh` executa ao subir o LocalStack e cria o bucket S3 e a fila SQS.
 
+Monta o banco.
+
+```bash
+uv run reset-db
+```
+
 ### 4. Inicie a aplicação
 
 ```bash
