@@ -1,0 +1,160 @@
+{
+  "info": {
+    "name": "Submissions Service",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "submission_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Criar Submission",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 201) {",
+              "    const body = pm.response.json();",
+              "    pm.collectionVariables.set('submission_id', body.id);",
+              "    pm.test('Status 201', () => pm.response.to.have.status(201));",
+              "    pm.test('Status é PENDING', () => pm.expect(body.status).to.eql('PENDING'));",
+              "    pm.test('Header Location presente', () => pm.response.to.have.header('Location'));",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"student_id\": \"aluno-001\",\n  \"text\": \"A tecnologia tem transformado a sociedade de maneira profunda e irreversível. As inovações digitais criaram novas formas de comunicação, trabalho e aprendizado. Contudo, é necessário refletir sobre os impactos sociais e éticos dessas mudanças, garantindo que o progresso tecnológico beneficie a todos, e não apenas uma parcela privilegiada da população.\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/submissions/",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "submissions", ""]
+        }
+      }
+    },
+    {
+      "name": "Buscar Submission por ID",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.test('ID correto', () => pm.expect(body.id).to.eql(pm.collectionVariables.get('submission_id')));",
+              "pm.test('Status válido', () => pm.expect(['PENDING', 'PROCESSING', 'GRADED', 'ERROR']).to.include(body.status));"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{base_url}}/api/v1/submissions/{{submission_id}}",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "submissions", "{{submission_id}}"]
+        }
+      }
+    },
+    {
+      "name": "Listar Submissions por Aluno",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.test('Possui items', () => pm.expect(body).to.have.property('items'));",
+              "pm.test('Possui total', () => pm.expect(body).to.have.property('total'));",
+              "pm.test('Possui page', () => pm.expect(body).to.have.property('page'));",
+              "pm.test('Possui per_page', () => pm.expect(body).to.have.property('per_page'));"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{base_url}}/api/v1/submissions/?student_id=aluno-001&page=1&per_page=10",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "submissions", ""],
+          "query": [
+            { "key": "student_id", "value": "aluno-001" },
+            { "key": "page", "value": "1" },
+            { "key": "per_page", "value": "10" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Buscar ID inexistente (404)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 404', () => pm.response.to.have.status(404));"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{base_url}}/api/v1/submissions/00000000-0000-0000-0000-000000000000",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "submissions", "00000000-0000-0000-0000-000000000000"]
+        }
+      }
+    },
+    {
+      "name": "Health Check",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "pm.test('Healthy', () => pm.expect(pm.response.json().status).to.eql('healthy'));"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{base_url}}/health",
+          "host": ["{{base_url}}"],
+          "path": ["health"]
+        }
+      }
+    }
+  ]
+}
