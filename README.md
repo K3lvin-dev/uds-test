@@ -2,8 +2,6 @@
 
 Micro-serviço REST para registro e correção automática de redações escolares com inteligência artificial (Google Gemini Flash).
 
----
-
 ## Stack
 
 | Tecnologia | Uso |
@@ -18,8 +16,6 @@ Micro-serviço REST para registro e correção automática de redações escolar
 | google-genai | Cliente oficial Google Gemini |
 | Docker Compose | Orquestração de infraestrutura local |
 | uv | Gerenciador de pacotes e ambiente virtual |
-
----
 
 ## Como Funciona
 
@@ -71,8 +67,6 @@ O campo `criteria` é um objeto JSONB com as seguintes dimensões, cada uma pont
 | `argumentation` | Qualidade e profundidade da argumentação |
 | `vocabulary` | Riqueza e adequação do vocabulário |
 
----
-
 ## Pré-requisitos
 
 - **Docker** e **Docker Compose** instalados
@@ -82,8 +76,6 @@ O campo `criteria` é um objeto JSONB com as seguintes dimensões, cada uma pont
   curl -LsSf https://astral.sh/uv/install.sh | sh
   ```
 - **Chave de API do Google Gemini**: obtenha em [https://aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)
-
----
 
 ## Rodando Localmente
 
@@ -109,7 +101,7 @@ uv sync
 
 ### 3. Suba a infraestrutura
 
-O Docker Compose gerencia apenas a infraestrutura — PostgreSQL e LocalStack (S3 + SQS). A aplicação roda como processo nativo, espelhando a separação real da AWS entre serviços gerenciados e compute.
+O Docker Compose gerencia apenas a infraestrutura  PostgreSQL e LocalStack (S3 + SQS). A aplicação roda como processo nativo, espelhando a separação real da AWS entre serviços gerenciados e compute.
 
 ```bash
 uv run infra
@@ -131,108 +123,17 @@ Sobe a API e o worker juntos no mesmo terminal, com output prefixado:
 [worker] [grade_worker] Started. Polling SQS...
 ```
 
-API disponível em `http://localhost:8000` — Swagger UI em `http://localhost:8000/docs`.
-
----
+API disponível em `http://localhost:8000`  Swagger UI em `http://localhost:8000/docs`.
 
 ## Endpoints
 
-### POST /api/v1/submissions/
+| Método | Path | Descrição |
+|---|---|---|
+| `POST` | `/api/v1/submissions/` | Cria uma submission e enfileira para correção |
+| `GET` | `/api/v1/submissions/{id}` | Retorna detalhes, status e resultado da correção |
+| `GET` | `/api/v1/submissions/` | Lista submissions de um aluno com paginação |
 
-Cria uma nova submission, fazendo upload da redação e enfileirando para correção automática.
-
-```bash
-curl -X POST http://localhost:8000/api/v1/submissions/ \
-  -H "Content-Type: application/json" \
-  -d '{
-    "student_id": "aluno-42",
-    "text": "A tecnologia transformou a sociedade contemporânea de maneira profunda e irreversível. O acesso à informação, antes restrito a poucos, democratizou-se com a internet, criando novas oportunidades e desafios para a educação e o mercado de trabalho."
-  }'
-```
-
-O header `Location` na resposta aponta para o endpoint de consulta: `Location: /api/v1/submissions/{id}`
-
-**Resposta (201 Created):**
-
-```json
-{
-  "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-  "student_id": "aluno-42",
-  "status": "PENDING",
-  "created_at": "2026-03-16T10:30:00-03:00"
-}
-```
-
----
-
-### GET /api/v1/submissions/{id}
-
-Retorna os detalhes de uma submission específica, incluindo o resultado da correção quando disponível.
-
-```bash
-curl http://localhost:8000/api/v1/submissions/f47ac10b-58cc-4372-a567-0e02b2c3d479
-```
-
-**Resposta (200 OK) — após correção:**
-
-```json
-{
-  "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-  "student_id": "aluno-42",
-  "s3_key": "submissions/f47ac10b-58cc-4372-a567-0e02b2c3d479.txt",
-  "status": "GRADED",
-  "score": 8.25,
-  "criteria": {
-    "grammar": 9.0,
-    "coherence": 8.5,
-    "argumentation": 7.5,
-    "vocabulary": 8.0
-  },
-  "overall_feedback": "A redação demonstra boa capacidade argumentativa e domínio gramatical. O texto é coeso e o vocabulário é adequado ao tema. Recomenda-se aprofundar os exemplos concretos para fortalecer a argumentação.",
-  "created_at": "2026-03-16T10:30:00-03:00",
-  "updated_at": "2026-03-16T10:30:45-03:00"
-}
-```
-
----
-
-### GET /api/v1/submissions/
-
-Lista as submissions de um estudante com suporte a paginação (ordenadas por data decrescente).
-
-```bash
-curl "http://localhost:8000/api/v1/submissions/?student_id=aluno-42&page=1&per_page=10"
-```
-
-**Resposta (200 OK):**
-
-```json
-{
-  "items": [
-    {
-      "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-      "student_id": "aluno-42",
-      "status": "GRADED",
-      "score": "8.25",
-      "created_at": "2026-03-16T10:30:00-03:00",
-      "updated_at": "2026-03-16T10:30:45-03:00"
-    }
-  ],
-  "total": 1,
-  "page": 1,
-  "per_page": 10
-}
-```
-
-**Parâmetros de query:**
-
-| Parâmetro | Tipo | Obrigatório | Descrição |
-|---|---|---|---|
-| `student_id` | string | Sim | Identificador do estudante |
-| `page` | inteiro | Não (padrão: 1) | Número da página (mínimo: 1) |
-| `per_page` | inteiro | Não (padrão: 10) | Itens por página (1–100) |
-
----
+Para exemplos de uso, importe a collection Postman incluída no repositório: `submissions-service.postman_collection.json`.
 
 ## Banco de Dados
 
@@ -267,45 +168,36 @@ CREATE INDEX IF NOT EXISTS idx_submissions_student_id_created_at
 
 O índice composto `(student_id, created_at DESC)` é especialmente relevante para o endpoint de listagem, pois elimina a necessidade de um sort separado no resultado e cobre a cláusula `WHERE student_id = ?` com ordenação decrescente em uma única varredura de índice.
 
----
-
 ## Estrutura do Projeto
 
 ```
 .
-├── docker-compose.yml          # Infraestrutura local: PostgreSQL, LocalStack, grade_worker
-├── Dockerfile                  # Imagem do grade_worker
+├── docker-compose.yml          # Infraestrutura local: PostgreSQL e LocalStack
+├── Dockerfile                  # Empacotamento para deploy (Lambda / ECS)
 ├── schema.sql                  # DDL do banco de dados
 ├── pyproject.toml              # Dependências e entry points (uv)
 ├── .env.example                # Variáveis de ambiente necessárias
 ├── scripts/
+│   ├── dev.py                  # Sobe API + worker juntos (uv run dev)
+│   ├── setup_infra.py          # Sobe infraestrutura Docker (uv run infra)
 │   └── init-aws.sh             # Cria bucket S3 e fila SQS no LocalStack
 └── src/
-    ├── main.py                 # Criação da aplicação FastAPI e registro de routers
+    ├── main.py                 # Criação da aplicação FastAPI e handler Lambda
     ├── infra/
     │   ├── config.py           # Configurações via variáveis de ambiente (pydantic-settings)
     │   ├── database.py         # Engine async e fábrica de sessões SQLAlchemy
     │   ├── models.py           # Modelo ORM Submission
     │   ├── s3.py               # Cliente S3 (upload e download)
     │   ├── sqs.py              # Cliente SQS (publish e delete)
-    │   └── types.py            # Tipos compartilhados (enums de status)
-    └── features/
-        └── submissions/
-            ├── create_submission/
-            │   ├── router.py   # POST /submissions
-            │   ├── handler.py  # Lógica: S3 upload + DB insert + SQS publish
-            │   └── schemas.py  # Request/Response Pydantic
-            ├── get_submission/
-            │   ├── router.py   # GET /submissions/{id}
-            │   ├── handler.py  # Lógica: DB select by id
-            │   └── schemas.py  # Response Pydantic
-            └── list_submissions/
-                ├── router.py   # GET /submissions/
-                ├── handler.py  # Lógica: DB select by student_id + paginação
-                └── schemas.py  # Query params e Response Pydantic
+    │   └── types.py            # Tipos compartilhados
+    ├── features/
+    │   └── submissions/
+    │       ├── create_submission/  # POST /api/v1/submissions/
+    │       ├── get_submission/     # GET /api/v1/submissions/{id}
+    │       └── list_submissions/   # GET /api/v1/submissions/
     └── workers/
         └── grade_submission/
-            ├── consumer.py     # Loop de polling SQS (daemon do worker)
+            ├── consumer.py     # Polling SQS (local) e lambda_handler (AWS)
             ├── handler.py      # Orquestra o fluxo de correção
             ├── grader.py       # Integração com Google Gemini Flash
             └── schemas.py      # Schemas internos do worker
@@ -313,19 +205,17 @@ O índice composto `(student_id, created_at DESC)` é especialmente relevante pa
 
 ### Vertical Slice Architecture (VSA)
 
-O projeto adota Vertical Slice Architecture: cada funcionalidade (criar submission, buscar por id, listar) é isolada em seu próprio diretório com router, handler e schemas próprios. Não existe uma camada de "serviços" ou "repositórios" compartilhada. Isso reduz o acoplamento entre funcionalidades, facilita a manutenção isolada de cada slice e torna o código mais fácil de navegar — para entender o que o endpoint `POST /submissions` faz, basta abrir `features/submissions/create_submission/`.
-
----
+O projeto adota Vertical Slice Architecture: cada funcionalidade (criar submission, buscar por id, listar) é isolada em seu próprio diretório com router, handler e schemas próprios. Não existe uma camada de "serviços" ou "repositórios" compartilhada. Isso reduz o acoplamento entre funcionalidades, facilita a manutenção isolada de cada slice e torna o código mais fácil de navegar  para entender o que o endpoint `POST /submissions` faz, basta abrir `features/submissions/create_submission/`.
 
 ## Arquitetura na AWS (Produção)
 
-Esta seção descreve como o serviço seria implantado em produção na AWS. O ambiente local já replica essa separação: Docker gerencia apenas a infraestrutura (PostgreSQL e LocalStack como substitutos de RDS e S3/SQS), enquanto a aplicação roda como processo nativo — da mesma forma que na AWS o compute (Lambda) é separado dos serviços gerenciados.
+Esta seção descreve como o serviço seria implantado em produção na AWS. O ambiente local já replica essa separação: Docker gerencia apenas a infraestrutura (PostgreSQL e LocalStack como substitutos de RDS e S3/SQS), enquanto a aplicação roda como processo nativo  da mesma forma que na AWS o compute (Lambda) é separado dos serviços gerenciados.
 
 ### API Gateway + Lambda
 
 A API seria exposta via **AWS API Gateway HTTP API** (não REST API). A HTTP API é significativamente mais barata e com latência menor para casos de uso padrão; a REST API oferece recursos adicionais (cache, planos de uso, API keys nativos) que não são necessários aqui.
 
-A aplicação FastAPI seria empacotada com o adaptador **Mangum**, que converte eventos do API Gateway/Lambda em requisições ASGI compatíveis com FastAPI — sem necessidade de reescrever a aplicação.
+A aplicação FastAPI seria empacotada com o adaptador **Mangum**, que converte eventos do API Gateway/Lambda em requisições ASGI compatíveis com FastAPI  sem necessidade de reescrever a aplicação.
 
 Cada endpoint poderia ser mapeado para uma função Lambda separada, o que permite:
 - IAM Roles granulares por função (princípio do menor privilégio)
@@ -339,7 +229,7 @@ O ponto de atenção é o **cold start**: funções Lambda Python têm latência
 O padrão de chave `submissions/{submission_id}.txt` se mantém idêntico ao ambiente local.
 
 Em produção:
-- A função Lambda assumiria uma **IAM Role** com permissão `s3:PutObject` e `s3:GetObject` restritas ao bucket específico — sem credenciais hardcoded no código ou variáveis de ambiente.
+- A função Lambda assumiria uma **IAM Role** com permissão `s3:PutObject` e `s3:GetObject` restritas ao bucket específico  sem credenciais hardcoded no código ou variáveis de ambiente.
 - **Lifecycle Policy**: objetos movidos para **S3 Glacier Instant Retrieval** após 90 dias, reduzindo custo de armazenamento para textos já processados.
 - **SSE-S3** (Server-Side Encryption com chaves gerenciadas pela AWS) habilitada por padrão no bucket.
 - **Bucket Policy** restritiva bloqueando acesso público e permitindo acesso apenas às roles IAM autorizadas.
@@ -348,7 +238,7 @@ Em produção:
 
 Em desenvolvimento local, o `grade_worker` é um daemon que faz polling contínuo na fila SQS. Em produção, esse daemon seria substituído pelo mecanismo nativo **Lambda Event Source Mapping (ESM)**.
 
-Com ESM, a própria AWS gerencia o polling da fila e invoca a Lambda automaticamente quando há mensagens disponíveis — eliminando a necessidade de manter um processo rodando continuamente.
+Com ESM, a própria AWS gerencia o polling da fila e invoca a Lambda automaticamente quando há mensagens disponíveis  eliminando a necessidade de manter um processo rodando continuamente.
 
 Configurações recomendadas:
 - **Batch size 1**: uma mensagem por invocação, simplificando o tratamento de erros (falha em uma mensagem não afeta outras)
@@ -383,13 +273,11 @@ O padrão **Transactional Outbox** resolve esse problema garantindo atomicidade 
 2. Um processo separado, o **relay worker**, faz polling periódico na tabela `outbox_events` usando `SELECT FOR UPDATE SKIP LOCKED` (lock otimista, seguro para múltiplas instâncias do relay).
 3. O relay publica a mensagem no SQS e marca o `OutboxEvent` como processado.
 
-Isso garante semântica **at-least-once**: se o relay falhar após publicar no SQS mas antes de marcar o evento como processado, ele republicará na próxima execução. Por isso, o consumer (grade_worker) deve ser **idempotente** — antes de processar, verifica se o status é diferente de `PENDING` (usando `SELECT FOR UPDATE`), descartando mensagens duplicadas.
+Isso garante semântica **at-least-once**: se o relay falhar após publicar no SQS mas antes de marcar o evento como processado, ele republicará na próxima execução. Por isso, o consumer (grade_worker) deve ser **idempotente**  antes de processar, verifica se o status é diferente de `PENDING` (usando `SELECT FOR UPDATE`), descartando mensagens duplicadas.
 
 #### Por que não está nesta implementação
 
 Em um contexto de desenvolvimento local com LocalStack, a probabilidade de falha entre o DB insert e o SQS publish é negligenciável. O Transactional Outbox adiciona complexidade operacional significativa (nova tabela, novo processo, lógica de idempotência explícita) que não se justifica para o escopo deste exercício técnico. Em produção, com tráfego real e múltiplas instâncias, a implementação seria necessária.
-
----
 
 ## Escalabilidade e Observabilidade
 
@@ -402,14 +290,14 @@ Em um contexto de desenvolvimento local com LocalStack, a probabilidade de falha
 
 ### Idempotência
 
-O `grade_worker` utiliza `SELECT FOR UPDATE` ao atualizar o status de `PENDING` para `PROCESSING`. Isso garante que, caso a mesma mensagem seja entregue mais de uma vez pelo SQS (semântica at-least-once), apenas uma invocação processará a submission — as demais encontrarão o status diferente de `PENDING` e descartarão a mensagem sem reprocessar.
+O `grade_worker` utiliza `SELECT FOR UPDATE` ao atualizar o status de `PENDING` para `PROCESSING`. Isso garante que, caso a mesma mensagem seja entregue mais de uma vez pelo SQS (semântica at-least-once), apenas uma invocação processará a submission  as demais encontrarão o status diferente de `PENDING` e descartarão a mensagem sem reprocessar.
 
 ### Retries e DLQ
 
 - **Visibility Timeout de 180s**: se o worker não deletar a mensagem dentro desse prazo (por timeout ou crash), a mensagem volta para a fila e pode ser reprocessada por outra instância.
 - **maxReceiveCount 3**: após três reentregas sem sucesso, a mensagem é movida para a **Dead Letter Queue**, evitando que uma mensagem "venenosa" bloqueie o processamento indefinidamente.
 - **DLQ para inspeção manual**: permite analisar a causa raiz de falhas persistentes e reprocessar as mensagens manualmente após correção.
-- **Campo `status ERROR`**: complementa a DLQ — mesmo que a mensagem já tenha sido deletada da fila, é possível identificar submissions com falha diretamente no banco de dados via `WHERE status = 'ERROR'`.
+- **Campo `status ERROR`**: complementa a DLQ  mesmo que a mensagem já tenha sido deletada da fila, é possível identificar submissions com falha diretamente no banco de dados via `WHERE status = 'ERROR'`.
 
 ### Logs e Métricas
 
