@@ -209,114 +209,98 @@ O projeto adota Vertical Slice Architecture: cada funcionalidade (criar submissi
 
 ## Arquitetura na AWS (Produção)
 
-Esta seção descreve como o serviço seria implantado em produção na AWS. O ambiente local já replica essa separação: Docker gerencia apenas a infraestrutura (PostgreSQL e LocalStack como substitutos de RDS e S3/SQS), enquanto a aplicação roda como processo nativo  da mesma forma que na AWS o compute (Lambda) é separado dos serviços gerenciados.
+```
+Cliente HTTP
+     |
+     v
+[ API Gateway ]
+     |
+     v
+[ Lambda  API ]  ───>  [ S3 ]
+     |
+     v
+[ SQS ]
+     |
+     v
+[ Lambda  Worker ]  ───>  [ Gemini ]
+     |
+     v
+[ RDS Proxy ]
+     |
+     v
+[ RDS PostgreSQL ]
+```
 
-### API Gateway + Lambda
+### Passo a Passo
 
-A API seria exposta via **AWS API Gateway HTTP API** (não REST API). A HTTP API é significativamente mais barata e com latência menor para casos de uso padrão; a REST API oferece recursos adicionais (cache, planos de uso, API keys nativos) que não são necessários aqui.
+**1. RDS PostgreSQL**
+Provisionar o banco com Multi-AZ para alta disponibilidade. Adicionar **RDS Proxy** na frente  Lambda escala rápido e abriria centenas de conexões simultâneas sem isso, esgotando o banco.
 
-A aplicação FastAPI seria empacotada com o adaptador **Mangum**, que converte eventos do API Gateway/Lambda em requisições ASGI compatíveis com FastAPI  sem necessidade de reescrever a aplicação.
+**2. S3**
+Criar o bucket com criptografia SSE-S3 e acesso público bloqueado. Lifecycle Policy para mover textos já processados para Glacier após 90 dias.
 
-Cada endpoint poderia ser mapeado para uma função Lambda separada, o que permite:
-- IAM Roles granulares por função (princípio do menor privilégio)
-- Escalabilidade independente por endpoint
-- Deploys isolados sem risco de regressão em outros endpoints
+**3. SQS**
+Criar a fila principal e uma **DLQ** vinculada. Configurar `Visibility Timeout 180s` e `maxReceiveCount 3`  após 3 falhas seguidas, a mensagem vai automaticamente para a DLQ.
 
-O ponto de atenção é o **cold start**: funções Lambda Python têm latência de inicialização na primeira invocação após um período de inatividade. Para mitigar, recomenda-se habilitar **Provisioned Concurrency** nos endpoints mais críticos ou usar Lambda SnapStart (disponível para runtimes Java, mas não Python nativamente).
+**4. Lambda (API)**
+Empacotar a FastAPI com **Mangum** (adaptador ASGI → Lambda). Configurar IAM Role com permissões mínimas (S3 + SQS + RDS Proxy). Conectar ao API Gateway.
 
-### S3
+**5. API Gateway HTTP API**
+Criar a HTTP API e rotear `/api/v1/submissions/*` para a Lambda da API. HTTP API é mais barata e mais rápida que REST API para esse caso de uso.
 
-O padrão de chave `submissions/{submission_id}.txt` se mantém idêntico ao ambiente local.
+**6. Lambda (Worker)**
+Deploy do `grade_worker` com **Event Source Mapping** na fila SQS (`batch size 1`). A AWS gerencia o polling automaticamente  sem necessidade de processo rodando continuamente. Configurar Concurrency Limit para não estourar os rate limits do Gemini.
 
-Em produção:
-- A função Lambda assumiria uma **IAM Role** com permissão `s3:PutObject` e `s3:GetObject` restritas ao bucket específico  sem credenciais hardcoded no código ou variáveis de ambiente.
-- **Lifecycle Policy**: objetos movidos para **S3 Glacier Instant Retrieval** após 90 dias, reduzindo custo de armazenamento para textos já processados.
-- **SSE-S3** (Server-Side Encryption com chaves gerenciadas pela AWS) habilitada por padrão no bucket.
-- **Bucket Policy** restritiva bloqueando acesso público e permitindo acesso apenas às roles IAM autorizadas.
+## Ajustes Futuros
 
-### SQS + Lambda Event Source Mapping
-
-Em desenvolvimento local, o `grade_worker` é um daemon que faz polling contínuo na fila SQS. Em produção, esse daemon seria substituído pelo mecanismo nativo **Lambda Event Source Mapping (ESM)**.
-
-Com ESM, a própria AWS gerencia o polling da fila e invoca a Lambda automaticamente quando há mensagens disponíveis  eliminando a necessidade de manter um processo rodando continuamente.
-
-Configurações recomendadas:
-- **Batch size 1**: uma mensagem por invocação, simplificando o tratamento de erros (falha em uma mensagem não afeta outras)
-- **Visibility Timeout 180s**: tempo suficiente para o Gemini processar a redação sem que a mensagem reapareça na fila prematuramente
-- **maxReceiveCount 3**: após 3 tentativas de processamento com falha, a mensagem é movida automaticamente para a Dead Letter Queue
-- **Dead Letter Queue (DLQ)**: fila SQS separada para mensagens que falharam repetidamente, permitindo inspeção manual e reprocessamento controlado
-
-### RDS PostgreSQL
-
-O banco de dados seria provisionado no **Amazon RDS PostgreSQL** com as seguintes configurações:
-
-- **Multi-AZ**: réplica síncrona em outra Availability Zone para alta disponibilidade e failover automático
-- **RDS Proxy**: componente crítico em arquiteturas serverless. Funções Lambda podem escalar para centenas de instâncias simultâneas em segundos, cada uma abrindo sua própria conexão com o banco. O PostgreSQL tem limite de conexões simultâneas, e esse padrão causa **connection exhaustion** rapidamente. O RDS Proxy mantém um pool de conexões persistentes com o banco e multiplexa as conexões das Lambdas sobre esse pool, resolvendo o problema sem alterações no código da aplicação.
-
-### Transactional Outbox Pattern (consideração de produção)
+### Transactional Outbox
 
 #### O problema
 
-No fluxo atual, a criação de uma submission envolve três operações sequenciais:
+Hoje, criar uma submission envolve 3 operações em sequência:
 
-1. Upload para o S3
-2. `INSERT` no PostgreSQL (status `PENDING`)
-3. Publicação da mensagem no SQS
+```
+1. Upload do texto → S3
+2. INSERT da submission (status PENDING) → PostgreSQL
+3. Publicar mensagem com submission_id → SQS
+```
 
-Essas três operações não são atômicas. Se a aplicação falhar entre o passo 2 e o passo 3 (por exemplo, um crash, timeout de rede ou exceção não tratada), a submission fica persistida no banco com status `PENDING` permanentemente, sem nunca ter sido enfileirada para correção. O estudante ficará esperando indefinidamente sem nenhuma resposta.
+Essas 3 operações **não são atômicas**. Se a aplicação travar ou perder conexão entre o passo 2 e o 3, a submission fica gravada no banco com status `PENDING` para sempre  nunca vai ser corrigida, e o estudante não recebe nenhum retorno.
 
-#### A solução: Transactional Outbox
+#### A solução com DynamoDB + Streams
 
-O padrão **Transactional Outbox** resolve esse problema garantindo atomicidade entre a escrita no banco e o enfileiramento:
+A ideia é simples: em vez de publicar no SQS diretamente, a Lambda da API **grava um registro no DynamoDB** junto com a submission no PostgreSQL. Aí entra o **DynamoDB Streams**: é um recurso nativo da AWS que monitora a tabela e, a cada inserção, dispara automaticamente uma Lambda.
 
-1. Em vez de publicar no SQS diretamente, a aplicação persiste dois registros na **mesma transação ACID**: o `Submission` (status `PENDING`) e um `OutboxEvent` (com o payload da mensagem SQS).
-2. Um processo separado, o **relay worker**, faz polling periódico na tabela `outbox_events` usando `SELECT FOR UPDATE SKIP LOCKED` (lock otimista, seguro para múltiplas instâncias do relay).
-3. O relay publica a mensagem no SQS e marca o `OutboxEvent` como processado.
+O fluxo fica assim:
 
-Isso garante semântica **at-least-once**: se o relay falhar após publicar no SQS mas antes de marcar o evento como processado, ele republicará na próxima execução. Por isso, o consumer (grade_worker) deve ser **idempotente**  antes de processar, verifica se o status é diferente de `PENDING` (usando `SELECT FOR UPDATE`), descartando mensagens duplicadas.
+```
+Lambda (API)
+    |
+    |── INSERT submission (PENDING) ──> PostgreSQL
+    |── PUT outbox_event ──────────────> DynamoDB
+                                              |
+                                    (DynamoDB Streams detecta o PUT)
+                                              |
+                                              v
+                                       Lambda (Relay)
+                                              |
+                                              v
+                                            SQS
+```
 
-#### Por que não está nesta implementação
+O ponto chave: a Lambda da API não se preocupa mais em publicar no SQS. Ela só grava no DynamoDB  e a partir daí a AWS cuida do resto automaticamente. Não tem polling, não tem processo rodando a cada minuto, não tem cron job. O Streams é event-driven: reagiu ao INSERT, disparou, acabou.
 
-Em um contexto de desenvolvimento local com LocalStack, a probabilidade de falha entre o DB insert e o SQS publish é negligenciável. O Transactional Outbox adiciona complexidade operacional significativa (nova tabela, novo processo, lógica de idempotência explícita) que não se justifica para o escopo deste exercício técnico. Em produção, com tráfego real e múltiplas instâncias, a implementação seria necessária.
+#### Por que isso resolve o problema
 
-## Escalabilidade e Observabilidade
+Antes, a falha podia acontecer entre o INSERT no banco e o publish no SQS  uma janela de risco real. Com esse padrão, o risco fica restrito à janela entre o INSERT no PostgreSQL e o PUT no DynamoDB, que são duas operações muito rápidas e locais. E mesmo que o PUT no DynamoDB falhe, a Lambda pode fazer retry sem efeito colateral nenhum  o DynamoDB é idempotente por chave.
 
-### Escalabilidade
+Não está implementado aqui porque localmente a chance de falha nessa janela é negligenciável. Em produção com tráfego real e múltiplas instâncias, valeria a pena.
 
-- **Lambda Concurrency Limit**: em produção, é importante configurar um limite de concorrência reservada para a Lambda do `grade_worker`. O Gemini tem limites de taxa (rate limits) por API key; sem limite de concorrência, um pico de mensagens na fila pode disparar centenas de invocações simultâneas e causar erros `429 Too Many Requests` no Gemini.
-- **SQS como buffer natural**: a fila absorve picos de submissões sem pressionar o banco de dados ou o Gemini diretamente. O processamento ocorre na taxa que a Lambda consegue sustentar.
-- **RDS Proxy**: conforme descrito acima, garante que o escalonamento horizontal das Lambdas não esgote as conexões do PostgreSQL.
-- **Índice composto**: o índice `(student_id, created_at DESC)` garante que queries paginadas no endpoint de listagem sejam eficientes mesmo com milhões de registros, sem full table scan.
+### Dead Letter Queue (DLQ)
 
-### Idempotência
+Após 3 tentativas de processamento com falha, a mensagem vai para a DLQ. Evita que uma mensagem problemática fique travando a fila indefinidamente. A DLQ serve para inspeção e reprocessamento manual após identificar a causa.
 
-O `grade_worker` utiliza `SELECT FOR UPDATE` ao atualizar o status de `PENDING` para `PROCESSING`. Isso garante que, caso a mesma mensagem seja entregue mais de uma vez pelo SQS (semântica at-least-once), apenas uma invocação processará a submission  as demais encontrarão o status diferente de `PENDING` e descartarão a mensagem sem reprocessar.
+### Observabilidade
 
-### Retries e DLQ
-
-- **Visibility Timeout de 180s**: se o worker não deletar a mensagem dentro desse prazo (por timeout ou crash), a mensagem volta para a fila e pode ser reprocessada por outra instância.
-- **maxReceiveCount 3**: após três reentregas sem sucesso, a mensagem é movida para a **Dead Letter Queue**, evitando que uma mensagem "venenosa" bloqueie o processamento indefinidamente.
-- **DLQ para inspeção manual**: permite analisar a causa raiz de falhas persistentes e reprocessar as mensagens manualmente após correção.
-- **Campo `status ERROR`**: complementa a DLQ  mesmo que a mensagem já tenha sido deletada da fila, é possível identificar submissions com falha diretamente no banco de dados via `WHERE status = 'ERROR'`.
-
-### Logs e Métricas
-
-- **CloudWatch Logs automático**: toda invocação de Lambda gera logs automaticamente no CloudWatch sem configuração adicional.
-- **Structured logging JSON**: os logs da aplicação devem ser emitidos em formato JSON estruturado para facilitar queries no CloudWatch Logs Insights (exemplo: filtrar por `submission_id`, `student_id` ou `status`).
-- **Métricas Lambda automáticas**: a AWS publica automaticamente no CloudWatch as seguintes métricas por função Lambda:
-  - `Invocations`: total de invocações
-  - `Errors`: invocações com erro
-  - `Duration`: tempo de execução (p50, p95, p99)
-  - `ConcurrentExecutions`: concorrência instantânea
-  - `Throttles`: invocações bloqueadas por limite de concorrência
-
-### Alertas Recomendados
-
-| Alerta | Métrica | Threshold | Justificativa |
-|---|---|---|---|
-| Alta taxa de erro na Lambda | `Lambda Errors / Invocations` | > 5% | Indica falhas sistemáticas no processamento |
-| Mensagens na DLQ | `SQS ApproximateNumberOfMessagesVisible` (DLQ) | > 0 | Qualquer mensagem na DLQ requer investigação |
-| Erros 5xx na API | `API Gateway 5XXError` | > 0 | Erros internos na API em produção |
-| Latência alta na API | `API Gateway IntegrationLatency p99` | > 2000ms | Degradação de experiência do usuário |
-| Conexões RDS próximas do limite | `RDS DatabaseConnections` | > 80% do máximo | Risco iminente de connection exhaustion |
-| Mensagens antigas na fila | `SQS ApproximateAgeOfOldestMessage` | > 5 minutos | Worker pode estar parado ou sobrecarregado |
+- **CloudWatch Logs**: Lambda já envia logs automaticamente. Usar JSON estruturado com `submission_id` e `student_id` para facilitar buscas no Logs Insights.
+- **Alertas essenciais**: erros > 5% na Lambda do worker, qualquer mensagem na DLQ, e latência p99 > 2s no API Gateway.
