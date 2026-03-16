@@ -47,6 +47,42 @@ Cliente HTTP
      |-- 9. Deleta a mensagem da fila SQS
 ```
 
+### Como o Worker Consome a Fila
+
+**Local**
+
+O `grade_worker` roda como um processo em loop contínuo, fazendo polling no SQS a cada poucos segundos: pergunta se tem mensagem, processa se tiver, dorme e repete. É um daemon que precisa estar vivo o tempo todo, mesmo sem nenhuma mensagem na fila.
+
+```
+while True:
+    mensagens = sqs.receive_message()
+    if mensagens:
+        processa()
+        sqs.delete_message()
+    else:
+        sleep(...)
+```
+
+**Na AWS**
+
+O daemon é substituído pelo **Event Source Mapping (ESM)**: você configura um link entre a fila SQS e a Lambda do worker, e a própria AWS passa a fazer o polling internamente. Quando uma mensagem chega na fila, a AWS invoca a Lambda automaticamente com a mensagem no evento.
+
+```
+SQS recebe mensagem
+         |
+         v
+AWS detecta via ESM
+         |
+         v
+Lambda é invocada com a mensagem
+         |
+         v
+Lambda processa e retorna
+(SQS deleta automaticamente se não houver erro)
+```
+
+Nenhum processo rodando em idle. Você paga apenas pelas invocações que acontecem.
+
 ### Ciclo de Vida de uma Submission
 
 | Status | Descrição |
@@ -271,28 +307,32 @@ Essas 3 operações **não são atômicas**. Se a aplicação travar ou perder c
 
 **Opção 1: Substituir o PostgreSQL por DynamoDB**
 
-Com DynamoDB como banco principal, é possível habilitar o **DynamoDB Streams**: um recurso nativo que monitora a tabela e dispara uma Lambda automaticamente a cada INSERT. Essa Lambda publica a mensagem no SQS sem nenhum polling, sem agendamento, sem processo rodando continuamente.
+A chave desta opção é **inverter a ordem das operações**: o registro no banco vem antes do upload no S3. Com isso, o usuário só recebe sucesso quando os dois passos foram concluídos. Se qualquer um falhar, retorna erro e nada fica em estado inconsistente.
 
 ```
-Lambda (API)
-    |
-    v
-INSERT submission (PENDING) → DynamoDB
-                                   |
-                        (Streams detecta o INSERT)
-                                   |
-                                   v
-                            Lambda (Relay)
-                                   |
-                                   v
-                                  SQS
+1. INSERT submission (PENDING) → DynamoDB
+        |
+        falhou? retorna erro pro usuário. nada no S3.
+        |
+        v
+2. Upload texto → S3
+        |
+        falhou? deleta o registro do DynamoDB. retorna erro pro usuário.
+        |
+        v
+3. DynamoDB Streams detecta o INSERT
+        |
+        v
+4. Lambda (Relay) publica → SQS
 ```
 
-A atomicidade está garantida porque existe apenas um banco. Se o INSERT no DynamoDB falhar, nada foi publicado no SQS. Se der certo, o Streams dispara e o resto acontece automaticamente.
+O **DynamoDB Streams** é um recurso nativo que monitora a tabela e dispara uma Lambda automaticamente a cada INSERT. Nenhum polling, nenhum processo rodando continuamente. Inseriu com sucesso, o Relay é invocado automaticamente.
+
+Resultado: sem arquivo zumbi no S3, sem submission presa como PENDING, sem texto armazenado no DynamoDB.
 
 **Opção 2: Manter o PostgreSQL com tabela outbox no mesmo banco**
 
-A tabela `outbox_events` fica no mesmo PostgreSQL, gravada dentro da **mesma transação** que o INSERT da submission. Isso garante atomicidade: ou os dois registros são gravados juntos ou nenhum é. Uma Lambda agendada via EventBridge (a cada 1 minuto, por exemplo) lê os eventos pendentes na tabela e publica no SQS.
+O texto da redação é gravado temporariamente no campo JSONB do `outbox_event`, dentro da mesma transação que o INSERT da submission. O S3 upload sai da Lambda da API e passa a ser responsabilidade do Relay Lambda, eliminando o risco de arquivo zumbi.
 
 ```
 Lambda (API)
@@ -300,18 +340,30 @@ Lambda (API)
     v
 Transação PostgreSQL
     |── INSERT submission (PENDING)
-    └── INSERT outbox_event
+    └── INSERT outbox_event (payload com o texto)
                 |
         (EventBridge a cada 1 min)
                 |
                 v
          Lambda (Relay)
-                |
-                v
-               SQS
+            |── Upload texto → S3
+            |── Publish → SQS
+            └── Deleta outbox_event
 ```
 
-A desvantagem é o polling periódico: há uma latência de até 1 minuto entre a criação da submission e o enfileiramento para correção.
+O usuário só recebe sucesso após a transação ser commitada. Se o Relay falhar no upload pro S3 ou no publish pro SQS, o EventBridge tenta novamente no próximo ciclo.
+
+A desvantagem é o polling periódico: há uma latência de até 1 minuto entre a criação da submission e o enfileiramento para correção. O texto também passa temporariamente pelo PostgreSQL antes de ir pro S3.
+
+---
+
+| | Opção 1 (DynamoDB) | Opção 2 (PostgreSQL) |
+|---|---|---|
+| Arquivo zumbi no S3 | Resolvido | Resolvido |
+| Submission PENDING eterna | Resolvido | Resolvido |
+| Latência de enfileiramento | Imediata (event-driven) | Até 1 minuto |
+| Texto em trânsito | Nunca sai do S3 | Passa pelo PostgreSQL temporariamente |
+| Impacto na stack atual | Troca o banco principal | Mantém PostgreSQL, adiciona outbox_event |
 
 Não está implementado neste projeto porque localmente a chance de falha entre o INSERT e o publish no SQS é negligenciável. Em produção com tráfego real, uma das duas abordagens seria necessária.
 
