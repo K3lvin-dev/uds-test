@@ -167,6 +167,13 @@ Sobe a API e o worker juntos no mesmo terminal, com output prefixado:
 
 API disponível em `http://localhost:8000`  Swagger UI em `http://localhost:8000/docs`.
 
+Antes de subir um commit rode:
+
+```bash
+uv run format
+```
+Isso vai formatar o codigo com o Ruff e verificar a tipagem com Pyright.
+
 ## Endpoints
 
 | Método | Path | Descrição |
