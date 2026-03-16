@@ -11,10 +11,12 @@ dependencies = [
     "boto3>=1.42.0",
     "google-genai",
     "pydantic-settings>=2.13.0",
+    "mangum>=0.19.0",
 ]
 
 [project.scripts]
 start = "src.main:start"
+dev = "scripts.dev:main"
 infra = "scripts.setup_infra:main"
 reset-db = "scripts.reset_db:main"
 format = "scripts:format_code"

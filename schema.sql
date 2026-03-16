@@ -3,7 +3,6 @@ CREATE TABLE IF NOT EXISTS submissions (
     student_id VARCHAR(100) NOT NULL,
     s3_key VARCHAR(500) NOT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
-    retry_count INT NOT NULL DEFAULT 0,
     score NUMERIC(4, 2),
     criteria JSONB,
     overall_feedback TEXT,
@@ -16,11 +15,3 @@ CREATE INDEX IF NOT EXISTS idx_submissions_student_id
 
 CREATE INDEX IF NOT EXISTS idx_submissions_student_id_created_at
     ON submissions (student_id, created_at DESC);
-
-CREATE TABLE IF NOT EXISTS outbox_events (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    aggregate_id VARCHAR(100) NOT NULL,
-    topic VARCHAR(200) NOT NULL,
-    payload JSONB NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);

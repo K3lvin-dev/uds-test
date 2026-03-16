@@ -1,5 +1,6 @@
 import uvicorn
 from fastapi import APIRouter, FastAPI
+from mangum import Mangum
 
 from src.features.submissions.create_submission.router import (
     setup as setup_create_submission,
@@ -29,6 +30,7 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
+handler = Mangum(app)  # entry point para AWS Lambda + API Gateway
 
 
 def start():
