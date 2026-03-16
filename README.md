@@ -28,8 +28,8 @@ Cliente HTTP
      v
   FastAPI (API)
      |
-     |-- 1. Faz upload do texto da redação para o S3
-     |-- 2. Persiste Submission com status PENDING no PostgreSQL
+     |-- 1. Persiste Submission com status PENDING no PostgreSQL
+     |-- 2. Faz upload do texto da redação para o S3 (falhou? deleta o registro e retorna erro)
      |-- 3. Publica mensagem com submission_id na fila SQS
      |
      v
